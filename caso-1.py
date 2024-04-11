@@ -12,6 +12,8 @@ def create_topology():
     # Agregar controlador
     c0 = net.addController('c0', controller=RemoteController, ip='127.0.0.1', port=6633)
 
+    # SUCURSAL 1
+
     # Agregar switch
     s1 = net.addSwitch('s1', cls=CustomSwitch, failMode='standalone')    
 
@@ -34,10 +36,31 @@ def create_topology():
     r1.cmd('ifconfig router-eth0 10.0.1.1 netmask 255.255.255.0')
     r1.cmd('ifconfig router-eth1 192.168.100.1 netmask 255.255.255.248')
 
+    # SUCURSAL 2
+
+    # Agregar switch
+    s2 = net.addSwitch('s2', cls=CustomSwitch, failMode='standalone')
+
+    # Agregar nodos
+    r2 = net.addHost('r2', cls=Node, ip=None)
+    h3 = net.addHost('h3', ip='10.0.2.2/24')
+    h4 = net.addHost('h4', ip='10.0.2.254/24')
+
+    # Agregar enlaces
+    net.addLink(h3, s2)
+    net.addLink(h4, s2)
+    net.addLink(r2, s2, intfName1='router-eth0', params={'ip': '10.0.2.1/24'})
+    net.addLink(rc, r2, intfName1='router-eth1', intfName2='router-eth1')
+
+    # Configurar las interfaces del router
+    r2.cmd('ifconfig router-eth0 10.0.2.1 netmask 255.255.255.0')
+    r2.cmd('ifconfig router-eth1 192.168.100.9 netmask 255.255.255.248')
+
     net.build()
     net.start()
 
-    # Configurar rutas estáticas en el router si es necesario
+    # Configurar rutas estáticas en el router
+    # SUCURSAL 1
     rc.cmd('route add default gw 192.168.100.6 router-eth0')
     rc.cmd('route add default gw 192.168.100.14 router-eth1')
 
@@ -47,8 +70,23 @@ def create_topology():
     h1.cmd('route add default gw 10.0.1.1')
     h2.cmd('route add default gw 10.0.1.1')
 
+    # SUCURSAL 2
+    r2.cmd('route add default gw 10.0.2.1 router-eth0')
+    r2.cmd('route add default gw 192.168.100.9 router-eth1')
+
+    h3.cmd('route add default gw 10.0.2.1')
+    h4.cmd('route add default gw 10.0.2.1')
+
     # Enrutamiento entre las redes
     rc.cmd('ip route add 10.0.1.0/24 via 192.168.100.1 dev router-eth0')
+    rc.cmd('ip route add 10.0.2.0/24 via 192.168.100.9 dev router-eth1')
+
+    r1.cmd('ip route add 10.0.2.0/24 via 192.168.100.6 dev router-eth1')
+    r1.cmd('ip route add 192.168.100.8/29 via 192.168.100.6 dev router-eth1')
+
+    r2.cmd('ip route add 10.0.1.0/24 via 192.168.100.14 dev router-eth1')
+    r2.cmd('ip route add 192.168.100.0/29 via 192.168.100.14 dev router-eth1')
+
 
     CLI(net)
     net.stop()
